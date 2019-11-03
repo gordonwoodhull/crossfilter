@@ -167,7 +167,6 @@ function crossfilter() {
         newValues, // temporary array storing newly-added values
         newIndex, // temporary array storing newly-added index
         iterablesIndexCount,
-        iterablesIndexFilterStatus,
         iterablesEmptyRows = [],
         sort = quicksort.by(function(i) { return newValues[i]; }),
         refilter = xfilterFilter.filterAll, // for recomputing filter
@@ -207,8 +206,7 @@ function crossfilter() {
     // Incorporates the specified new records into this dimension.
     // This function is responsible for updating filters, values, and index.
     function preAdd(newData, n0, n1) {
-      var newIterablesIndexCount,
-          newIterablesIndexFilterStatus;
+      var newIterablesIndexCount;
 
       if (iterable){
         // Count all the values
@@ -224,7 +222,6 @@ function crossfilter() {
 
         newValues = [];
         newIterablesIndexCount = crossfilter_range(newData.length);
-        newIterablesIndexFilterStatus = crossfilter_index(t,1);
         var unsortedIndex = crossfilter_range(t);
 
         for (var l = 0, index1 = 0; index1 < newData.length; index1++) {
@@ -273,7 +270,6 @@ function crossfilter() {
               if(--newIterablesIndexCount[newIndex[index2]] === 0) {
                 filters[offset][newIndex[index2] + n0] |= one;
               }
-              newIterablesIndexFilterStatus[index2] = 1;
             }
           }
         } else {
@@ -281,13 +277,11 @@ function crossfilter() {
             if(--newIterablesIndexCount[newIndex[index3]] === 0) {
               filters[offset][newIndex[index3] + n0] |= one;
             }
-            newIterablesIndexFilterStatus[index3] = 1;
           }
           for (index4 = hi1; index4 < n1; ++index4) {
             if(--newIterablesIndexCount[newIndex[index4]] === 0) {
               filters[offset][newIndex[index4] + n0] |= one;
             }
-            newIterablesIndexFilterStatus[index4] = 1;
           }
         }
       } else {
@@ -313,7 +307,6 @@ function crossfilter() {
         values = newValues;
         index = newIndex;
         iterablesIndexCount = newIterablesIndexCount;
-        iterablesIndexFilterStatus = newIterablesIndexFilterStatus;
         lo0 = lo1;
         hi0 = hi1;
         return;
@@ -323,7 +316,6 @@ function crossfilter() {
 
       var oldValues = values,
         oldIndex = index,
-        oldIterablesIndexFilterStatus = iterablesIndexFilterStatus,
         old_n0,
         i1 = 0;
 
@@ -338,7 +330,6 @@ function crossfilter() {
       // Otherwise, create new arrays into which to merge new and old.
       values = iterable ? new Array(n0 + n1) : new Array(n);
       index = iterable ? new Array(n0 + n1) : crossfilter_index(n, n);
-      if(iterable) iterablesIndexFilterStatus = crossfilter_index(n0 + n1, 1);
 
       // Concatenate the newIterablesIndexCount onto the old one.
       if(iterable) {
@@ -354,11 +345,9 @@ function crossfilter() {
       for (; i0 < n0 && i1 < n1; ++index5) {
         if (oldValues[i0] < newValues[i1]) {
           values[index5] = oldValues[i0];
-          if(iterable) iterablesIndexFilterStatus[index5] = oldIterablesIndexFilterStatus[i0];
           index[index5] = oldIndex[i0++];
         } else {
           values[index5] = newValues[i1];
-          if(iterable) iterablesIndexFilterStatus[index5] = newIterablesIndexFilterStatus[i1];
           index[index5] = newIndex[i1++] + (iterable ? old_n0 : n0);
         }
       }
@@ -366,14 +355,12 @@ function crossfilter() {
       // Add any remaining old values.
       for (; i0 < n0; ++i0, ++index5) {
         values[index5] = oldValues[i0];
-        if(iterable) iterablesIndexFilterStatus[index5] = oldIterablesIndexFilterStatus[i0];
         index[index5] = oldIndex[i0];
       }
 
       // Add any remaining new values.
       for (; i1 < n1; ++i1, ++index5) {
         values[index5] = newValues[i1];
-        if(iterable) iterablesIndexFilterStatus[index5] = newIterablesIndexFilterStatus[i1];
         index[index5] = newIndex[i1] + (iterable ? old_n0 : n0);
       }
 
@@ -411,14 +398,10 @@ function crossfilter() {
         if (reIndex[oldDataIndex] !== REMOVED_INDEX) {
           if (i !== j) values[j] = values[i];
           index[j] = reIndex[oldDataIndex];
-          if (iterable) {
-            iterablesIndexFilterStatus[j] = iterablesIndexFilterStatus[i];
-          }
           ++j;
         }
       }
       values.length = j;
-      if (iterable) iterablesIndexFilterStatus.length = j;
       while (j < n0) index[j++] = 0;
 
       // Bisect again to recompute lo0 and hi0.
@@ -496,7 +479,6 @@ function crossfilter() {
         var newRemoved = [];
         for (i = 0; i < added.length; i++) {
           iterablesIndexCount[added[i]]++
-          iterablesIndexFilterStatus[valueIndexAdded[i]] = 0;
           if(iterablesIndexCount[added[i]] === 1) {
             filters[offset][added[i]] ^= one;
             newAdded.push(added[i]);
@@ -504,7 +486,6 @@ function crossfilter() {
         }
         for (i = 0; i < removed.length; i++) {
           iterablesIndexCount[removed[i]]--
-          iterablesIndexFilterStatus[valueIndexRemoved[i]] = 1;
           if(iterablesIndexCount[removed[i]] === 0) {
             filters[offset][removed[i]] ^= one;
             newRemoved.push(removed[i]);
@@ -636,25 +617,17 @@ function crossfilter() {
         var newAdded = [];
         var newRemoved = [];
         for (i = 0; i < added.length; i++) {
-          // First check this particular value needs to be added
-          if(iterablesIndexFilterStatus[valueIndexAdded[i]] === 1) {
-            iterablesIndexCount[added[i]]++
-            iterablesIndexFilterStatus[valueIndexAdded[i]] = 0;
-            if(iterablesIndexCount[added[i]] === 1) {
-              filters[offset][added[i]] ^= one;
-              newAdded.push(added[i]);
-            }
+          iterablesIndexCount[added[i]]++
+          if(iterablesIndexCount[added[i]] === 1) {
+            filters[offset][added[i]] ^= one;
+            newAdded.push(added[i]);
           }
         }
         for (i = 0; i < removed.length; i++) {
-          // First check this particular value needs to be removed
-          if(iterablesIndexFilterStatus[valueIndexRemoved[i]] === 0) {
-            iterablesIndexCount[removed[i]]--
-            iterablesIndexFilterStatus[valueIndexRemoved[i]] = 1;
-            if(iterablesIndexCount[removed[i]] === 0) {
-              filters[offset][removed[i]] ^= one;
-              newRemoved.push(removed[i]);
-            }
+          iterablesIndexCount[removed[i]]--
+          if(iterablesIndexCount[removed[i]] === 0) {
+            filters[offset][removed[i]] ^= one;
+            newRemoved.push(removed[i]);
           }
         }
 
